@@ -1,0 +1,13 @@
+Project Goal:
+	
+		Create a csgo analyitc tool that takes the pain out of looking through your demos(demos suck)
+	so that you can improve you decision making and game sense. I.E. grenades (where they land, how effective they are, and if
+	there is a line up that could have been used to be more effective), deaths (where you die, how often, heatmap of location on map,
+	what could have been done differently), positioning, etc. etc.
+		In game replay for "teachable" moments, I.E. showing where a flash landed and the LOS of the flash and where you could have thrown it.
+		In game practice tools: grenade lineups, taking sites, clearing angles.
+
+
+
+
+IN GAME REPLAY: 
