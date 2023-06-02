@@ -25,38 +25,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const demofile_1 = require("demofile");
 const fs = __importStar(require("fs"));
-//Parse a CS:GO demo file and create a new "controls" file to be used by the "Custom Demo Replay Tool" to mimic player controls in engine
-//Consolidates all relevent game events and records player information each tick. || grenade thrown, weapon fired, player health, player pos, etc. 
-//Create a "data" file that returns the end game stats of each player || Deaths, flashbangs thrown, players blinded, etc.
-//NOTES: 
-//Need to handle things like players reconnecting and disconnecting and still being able to track them || Will probably use "name" string off of demoFile.entities.players[i].name
-//Make sure we save the old name when name changes happen
-class PracticeFileCreator //Gather all the data needed for the practice file and write to a file
- {
-    constructor() {
-        this.userThrowGrenadeEvents = []; //all user throw grenade events
-        this.userGrenadeExplodes = []; //all user grenade explosion events
-        this.userDeathEvents = []; //all user death events
-        this.userKillEvents = []; //all user kill events
-    }
-    addThrowGrenadeEvent(event) {
-        this.userThrowGrenadeEvents.push(Object.assign({}, event));
-    }
-    addGrenadeExplodeEvent(event) {
-        this.userGrenadeExplodes.push(Object.assign({}, event));
-    }
-    addUserDeathEvent(event) {
-        this.userDeathEvents.push(Object.assign({}, event));
-    }
-    addUserKillEvent(event) {
-        this.userKillEvents.push(event);
-    }
-    setMap(map) {
-        this.map = map;
-    }
-    createFile() {
-    }
-}
+//import { PlayerKillSnapshot, PlayerDeathSnapshot, GrenadeExplodeSnapshot, GrenadeThrowSnapshot } from "./utility/snapshots";
+const PracticeFileCreator_1 = require("./utility/PracticeFileCreator");
 class DemoPlaybackFrame {
     constructor() {
         this.playerData = [];
@@ -178,48 +148,56 @@ function gatherEndFrameData(demoFile) {
     return playerData;
     //console.log(playerData);
 }
-function parseDemoFile(path) {
-    const stream = fs.createReadStream(path);
-    const demoFile = new demofile_1.DemoFile();
-    demoFile.on("start", ({ cancel }) => {
-        console.log("Tick rate:", demoFile.tickRate);
-        console.log("Duration (seconds):", demoFile.header.playbackTime);
-        console.log("Playback frames: ", demoFile.header.playbackFrames);
-        //playback.header = demoFile.header;
-    });
-    demoFile.on("tickstart", () => {
-        //console.log(demoFile.currentTick)
-        demoParser.beginFrame(demoFile.currentTick);
-    });
-    demoFile.on("tickend", () => {
-        const data = gatherEndFrameData(demoFile);
-        if (data === null || data === void 0 ? void 0 : data.length)
-            demoParser.setFramePlayerData(data);
-        demoParser.endFrame();
-        //console.log(demoFile.currentTick)
-    });
-    demoFile.gameEvents.on("player_blind", (e) => {
-    });
-    demoFile.on("grenadeTrajectory", (e) => {
-        demoParser.addGrenadeEvent(e);
-        //console.log(e.thrower.name, "threw a ", e.projectile.grenadeType)
-    });
-    demoFile.on("molotovDetonate", (e) => {
-    });
-    demoFile.gameEvents.on("smokegrenade_detonate", (e) => {
-    });
-    demoFile.gameEvents.on("hegrenade_detonate", (e) => {
-    });
-    demoFile.gameEvents.on("flashbang_detonate", (e) => {
-        //console.log(e.player.name);
-    });
-    demoFile.on("end", (e) => {
-        if (e.error) {
-            console.error("Error during parsing:", e.error);
-            process.exitCode = 1;
-        }
-        console.log(demoParser.playerList, demoParser.allGrenadeEventList[1].trajectory[3]);
-    });
-    demoFile.parseStream(stream);
+class DemoParser {
+    constructor() {
+        this.pFile = new PracticeFileCreator_1.PracticeFileCreator();
+    }
+    parseDemoFile(path) {
+        const stream = fs.createReadStream(path);
+        const demoFile = new demofile_1.DemoFile();
+        demoFile.on("start", ({ cancel }) => {
+            console.log("Tick rate:", demoFile.tickRate);
+            console.log("Duration (seconds):", demoFile.header.playbackTime);
+            console.log("Playback frames: ", demoFile.header.playbackFrames);
+            //playback.header = demoFile.header;
+        });
+        demoFile.on("tickstart", () => {
+            //console.log(demoFile.currentTick)
+            demoParser.beginFrame(demoFile.currentTick);
+        });
+        demoFile.on("tickend", () => {
+            const data = gatherEndFrameData(demoFile);
+            if (data === null || data === void 0 ? void 0 : data.length)
+                demoParser.setFramePlayerData(data);
+            demoParser.endFrame();
+            //console.log(demoFile.currentTick)
+        });
+        demoFile.gameEvents.on("player_blind", (e) => {
+        });
+        demoFile.on("grenadeTrajectory", (e) => {
+            if (demoFile.entities.getByUserId(e.thrower.userId) != null)
+                e.thrower = demoFile.entities.getByUserId(e.thrower.userId);
+            this.pFile.addGrenadeThrowEvent(e, demoFile);
+            //console.log(e.thrower.name, "threw a ", e.projectile.grenadeType)
+        });
+        demoFile.on("molotovDetonate", (e) => {
+        });
+        demoFile.gameEvents.on("smokegrenade_detonate", (e) => {
+        });
+        demoFile.gameEvents.on("hegrenade_detonate", (e) => {
+        });
+        demoFile.gameEvents.on("flashbang_detonate", (e) => {
+            //console.log(e.player.name);
+        });
+        demoFile.on("end", (e) => {
+            if (e.error) {
+                console.error("Error during parsing:", e.error);
+                process.exitCode = 1;
+            }
+            this.pFile.CreateFile();
+        });
+        demoFile.parseStream(stream);
+    }
 }
-parseDemoFile("../demos/match730_003618992909509984527_0796506629_129.dem");
+const parse = new DemoParser();
+parse.parseDemoFile("../demos/match730_003618992909509984527_0796506629_129.dem");

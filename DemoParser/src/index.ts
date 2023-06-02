@@ -3,7 +3,8 @@ import { PlayerMedalsInfo } from "demofile/dist/protobufs/cstrike15_gcmessages";
 import { IGrenadeTrajectoryEvent } from "demofile/dist/supplements/grenadetrajectory";
 import * as fs from "fs";
 
-import { PlayerKillSnapshot, PlayerDeathSnapshot, GrenadeExplodeSnapshot, GrenadeThrowSnapshot } from "./utility/snapshots";
+//import { PlayerKillSnapshot, PlayerDeathSnapshot, GrenadeExplodeSnapshot, GrenadeThrowSnapshot } from "./utility/snapshots";
+import { PracticeFileCreator } from "./utility/PracticeFileCreator"
 
 //Parse a CS:GO demo file and create a new "controls" file to be used by the "Custom Demo Replay Tool" to mimic player controls in engine
 //Consolidates all relevent game events and records player information each tick. || grenade thrown, weapon fired, player health, player pos, etc. 
@@ -16,41 +17,6 @@ import { PlayerKillSnapshot, PlayerDeathSnapshot, GrenadeExplodeSnapshot, Grenad
 
 
 
-
-class PracticeFileCreator //Gather all the data needed for the practice file and write to a file
-{
-    private map!: string; //map events took place in || each demo should only ever be one map
-    private userThrowGrenadeEvents: GrenadeThrowSnapshot[] = [];//all user throw grenade events
-    private userGrenadeExplodes: GrenadeExplodeSnapshot[] = [];//all user grenade explosion events
-    private userDeathEvents: PlayerDeathSnapshot[] = [];//all user death events
-    private userKillEvents: PlayerKillSnapshot[] = [];//all user kill events
-
-    public addThrowGrenadeEvent(event: GrenadeThrowSnapshot)
-    {
-        this.userThrowGrenadeEvents.push({ ...event });
-    }
-    public addGrenadeExplodeEvent(event: GrenadeExplodeSnapshot)
-    {
-        this.userGrenadeExplodes.push({ ...event });
-    }
-    public addUserDeathEvent(event: PlayerDeathSnapshot)
-    {
-        this.userDeathEvents.push({ ...event });
-    }
-    public addUserKillEvent(event: PlayerKillSnapshot)
-    {
-        this.userKillEvents.push(event);
-    }
-    public setMap(map:string)
-    {
-        this.map = map;
-    }
-    public createFile() //write all data that the practice tool needs from the demo to a file
-    {
-
-    }
-
-}
 
 
 interface HeaderData
@@ -208,7 +174,7 @@ class DemoDataParser
         this.userId = id;
     }
 
-}   
+} 
 
 
 const demoParser = new DemoDataParser();
@@ -238,75 +204,76 @@ function gatherEndFrameData(demoFile: DemoFile)
     //console.log(playerData);
 }
 
-function parseDemoFile(path: string)
+
+
+
+class DemoParser
 {
-    const stream = fs.createReadStream(path);
-    const demoFile = new DemoFile();
+    private pFile = new PracticeFileCreator();
 
-    demoFile.on("start", ({ cancel })=>
+    public parseDemoFile(path: string)
     {
-        console.log("Tick rate:", demoFile.tickRate);
-        console.log("Duration (seconds):", demoFile.header.playbackTime);
-        console.log("Playback frames: ", demoFile.header.playbackFrames);
-        //playback.header = demoFile.header;
-    });
+        const stream = fs.createReadStream(path);
+        const demoFile = new DemoFile();
 
-
-    demoFile.on("tickstart", ()=>
-    {
-        //console.log(demoFile.currentTick)
-        demoParser.beginFrame(demoFile.currentTick);
-    })
-
-    demoFile.on("tickend", ()=>
-    {
-        const data = gatherEndFrameData(demoFile);
-        if(data?.length)
-        demoParser.setFramePlayerData(data)
-        demoParser.endFrame();
-        //console.log(demoFile.currentTick)
-    })
-
-    demoFile.gameEvents.on("player_blind", (e)=>
-    {
-
-    })
-
-    demoFile.on("grenadeTrajectory", (e)=>
-    {
-        demoParser.addGrenadeEvent(e);
-       //console.log(e.thrower.name, "threw a ", e.projectile.grenadeType)
-    })
-
-    demoFile.on("molotovDetonate", (e)=>
-    {
-        
-    });
-    
-    demoFile.gameEvents.on("smokegrenade_detonate", (e)=>
-    {
-
-    })
-    demoFile.gameEvents.on("hegrenade_detonate",(e)=>
-    {
-
-    })
-    demoFile.gameEvents.on("flashbang_detonate", (e)=>
-    {
-        //console.log(e.player.name);
-    })
-
-    demoFile.on("end", (e)=>
-    {
-        if(e.error)
+        demoFile.on("start", ({ cancel })=>
         {
-            console.error("Error during parsing:", e.error);
-            process.exitCode = 1;
-        }
-        console.log(demoParser.playerList, demoParser.allGrenadeEventList[1].trajectory[3])
-    });
+            console.log("Tick rate:", demoFile.tickRate);
+            console.log("Duration (seconds):", demoFile.header.playbackTime);
+            console.log("Playback frames: ", demoFile.header.playbackFrames);
+            //playback.header = demoFile.header;
+        });
+        demoFile.on("tickstart", ()=>
+        {
+            //console.log(demoFile.currentTick)
+            demoParser.beginFrame(demoFile.currentTick);
+        });
+        demoFile.on("tickend", ()=>
+        {
+            const data = gatherEndFrameData(demoFile);
+            if(data?.length)
+            demoParser.setFramePlayerData(data)
+            demoParser.endFrame();
+            //console.log(demoFile.currentTick)
+        });
+        demoFile.gameEvents.on("player_blind", (e)=>
+        {
+        });
+        demoFile.on("grenadeTrajectory", (e)=>
+        {
+            if(demoFile.entities.getByUserId(e.thrower.userId) != null) e.thrower = demoFile.entities.getByUserId(e.thrower.userId);
+            this.pFile.addGrenadeThrowEvent(e, demoFile);
+            //console.log(e.thrower.name, "threw a ", e.projectile.grenadeType)
+        });
+        demoFile.on("molotovDetonate", (e)=>
+        {
+        });
+        demoFile.gameEvents.on("smokegrenade_detonate", (e)=>
+        {
+        });
+        demoFile.gameEvents.on("hegrenade_detonate",(e)=>
+        {
+        });
+        demoFile.gameEvents.on("flashbang_detonate", (e)=>
+        {
+            //console.log(e.player.name);
+        });
+        demoFile.on("end", (e)=>
+        {
+            if(e.error)
+            {
+                console.error("Error during parsing:", e.error);
+                process.exitCode = 1;
+            }
+            this.pFile.CreateFile();
+        });
 
-    demoFile.parseStream(stream);
+
+
+        demoFile.parseStream(stream);
+    }
 }
 
-parseDemoFile("../demos/match730_003618992909509984527_0796506629_129.dem")
+const parse = new DemoParser();
+
+parse.parseDemoFile("../demos/match730_003618992909509984527_0796506629_129.dem");
