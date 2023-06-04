@@ -151,6 +151,7 @@ function gatherEndFrameData(demoFile) {
 class DemoParser {
     constructor() {
         this.pFile = new PracticeFileCreator_1.PracticeFileCreator();
+        this.user = "Whale";
     }
     parseDemoFile(path) {
         const stream = fs.createReadStream(path);
@@ -175,9 +176,8 @@ class DemoParser {
         demoFile.gameEvents.on("player_blind", (e) => {
         });
         demoFile.on("grenadeTrajectory", (e) => {
-            if (demoFile.entities.getByUserId(e.thrower.userId) != null)
-                e.thrower = demoFile.entities.getByUserId(e.thrower.userId);
-            this.pFile.addGrenadeThrowEvent(e, demoFile);
+            if (e.thrower.name === this.user)
+                this.pFile.addGrenadeThrowEvent(e, demoFile);
             //console.log(e.thrower.name, "threw a ", e.projectile.grenadeType)
         });
         demoFile.on("molotovDetonate", (e) => {
@@ -187,14 +187,15 @@ class DemoParser {
         demoFile.gameEvents.on("hegrenade_detonate", (e) => {
         });
         demoFile.gameEvents.on("flashbang_detonate", (e) => {
-            //console.log(e.player.name);
+            if (e.player.name === this.user)
+                this.pFile.addGrenadeExplodeEvent({ type: "flashbang", thrower: e.player.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), position: { x: e.x, y: e.y, z: e.z } });
         });
         demoFile.on("end", (e) => {
             if (e.error) {
                 console.error("Error during parsing:", e.error);
                 process.exitCode = 1;
             }
-            this.pFile.CreateFile();
+            this.pFile.createFile();
         });
         demoFile.parseStream(stream);
     }

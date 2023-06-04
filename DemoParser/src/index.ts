@@ -5,6 +5,7 @@ import * as fs from "fs";
 
 //import { PlayerKillSnapshot, PlayerDeathSnapshot, GrenadeExplodeSnapshot, GrenadeThrowSnapshot } from "./utility/snapshots";
 import { PracticeFileCreator } from "./utility/PracticeFileCreator"
+import { CMsgVector } from "demofile/dist/protobufs/netmessages";
 
 //Parse a CS:GO demo file and create a new "controls" file to be used by the "Custom Demo Replay Tool" to mimic player controls in engine
 //Consolidates all relevent game events and records player information each tick. || grenade thrown, weapon fired, player health, player pos, etc. 
@@ -204,13 +205,10 @@ function gatherEndFrameData(demoFile: DemoFile)
     //console.log(playerData);
 }
 
-
-
-
 class DemoParser
 {
     private pFile = new PracticeFileCreator();
-
+    private user: string = "Whale";
     public parseDemoFile(path: string)
     {
         const stream = fs.createReadStream(path);
@@ -241,8 +239,8 @@ class DemoParser
         });
         demoFile.on("grenadeTrajectory", (e)=>
         {
-            if(demoFile.entities.getByUserId(e.thrower.userId) != null) e.thrower = demoFile.entities.getByUserId(e.thrower.userId);
-            this.pFile.addGrenadeThrowEvent(e, demoFile);
+            if(e.thrower.name === this.user)
+                this.pFile.addGrenadeThrowEvent(e, demoFile);
             //console.log(e.thrower.name, "threw a ", e.projectile.grenadeType)
         });
         demoFile.on("molotovDetonate", (e)=>
@@ -256,7 +254,8 @@ class DemoParser
         });
         demoFile.gameEvents.on("flashbang_detonate", (e)=>
         {
-            //console.log(e.player.name);
+            if(e.player.name === this.user)
+                this.pFile.addGrenadeExplodeEvent({type: "flashbang", thrower: e.player.userId, playerPos: demoFile.entities.players.map(p=>{return p.position;}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles}), position: {x: e.x, y: e.y, z: e.z}});
         });
         demoFile.on("end", (e)=>
         {
@@ -265,7 +264,7 @@ class DemoParser
                 console.error("Error during parsing:", e.error);
                 process.exitCode = 1;
             }
-            this.pFile.CreateFile();
+            this.pFile.createFile();
         });
 
 
