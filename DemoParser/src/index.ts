@@ -240,8 +240,24 @@ class DemoParser
         demoFile.on("grenadeTrajectory", (e)=>
         {
             if(e.thrower.name === this.user)
-                this.pFile.addGrenadeThrowEvent(e, demoFile);
-            //console.log(e.thrower.name, "threw a ", e.projectile.grenadeType)
+               {
+                switch(e.projectile.grenadeType)
+                {
+                    case "flashbang":
+                        this.pFile.addFlashbangThrowEvent({type: "flashbang", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p=>{return p.position}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles}), trajectory: e.trajectory});
+                    case "molotov":
+                        this.pFile.addMolotovThrowEvent({type: "molotov", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p=>{return p.position;}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles;}), trajectory: e.trajectory});
+                    case "smoke":
+                        this.pFile.addSmokeThrowEvent({type: "smoke", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p=>{return p.position;}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles;}), trajectory: e.trajectory});
+                    case "explosive":
+                        this.pFile.addHeGrenadeThrowEvent({type:"explosive", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p=>{return p.position}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles}), trajectory: e.trajectory});
+                    case "decoy":
+                        this.pFile.addDecoyThrowEvent({type: "decoy", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p=>{return p.position}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles}), trajectory: e.trajectory});
+                    case "incendiary":
+                        this.pFile.addIncendiaryThrowEvent({type: "incendiary", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p=>{return p.position}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles}), trajectory: e.trajectory});
+
+                }   
+               }
         });
         demoFile.on("molotovDetonate", (e)=>
         {
@@ -255,7 +271,7 @@ class DemoParser
         demoFile.gameEvents.on("flashbang_detonate", (e)=>
         {
             if(e.player.name === this.user)
-                this.pFile.addGrenadeExplodeEvent({type: "flashbang", thrower: e.player.userId, playerPos: demoFile.entities.players.map(p=>{return p.position;}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles}), position: {x: e.x, y: e.y, z: e.z}});
+                this.pFile.addFlashbangDetonateEvent({type: "flashbang", thrower: e.player.userId, playerPos: demoFile.entities.players.map(p=>{return p.position;}), playerEyes: demoFile.entities.players.map(p=>{return p.eyeAngles}), position: {x: e.x, y: e.y, z: e.z}});
         });
         demoFile.on("end", (e)=>
         {
@@ -264,7 +280,7 @@ class DemoParser
                 console.error("Error during parsing:", e.error);
                 process.exitCode = 1;
             }
-            this.pFile.createFile();
+            this.pFile.createFiles();
         });
 
 

@@ -26,6 +26,9 @@ export class PracticeFileCreator
     private userMolotovThrowEvent: GrenadeThrowSnapshot[] = [];
     private userMolotovDetonateEvent: GrenadeExplodeSnapshot[] = [];
 
+    private userIncendiaryThrowEvent: GrenadeThrowSnapshot[] = [];
+    private userIncendiaryDetonateEvent: GrenadeExplodeSnapshot[] = [];
+
     private userHeGrenadeThrowEvent: GrenadeThrowSnapshot[] = [];
     private userHeGrenadeDetonateEvent: GrenadeExplodeSnapshot[] = [];
 
@@ -39,37 +42,13 @@ export class PracticeFileCreator
 
     private eventFired: boolean = false; //checks that at least one event fired
 
-    public createFile()
+    public createFiles()
     {
-        const path:string = "./PracticeFileOut/test.json";
-        const userMolotoveDetonate:string = "./PracticeFileOut/molotoves.json";
-        const userHe_GranadeDetonate:string = "./PracticeFileOut/he_grenades.json";
-
-        this.createFlashbangFile();
-        this.createMolotovFile();
-        const writeStream = fs.createWriteStream(path);
-
-        writeStream.on("ready", ()=>
-        {
-            console.log("Creating the practice file...");
-
-            //Grenade Events
-            console.log("Writing grenade events...")
-            this.writeEventArray(writeStream, this.userThrowGrenadeEventList);
-            console.log("Grenade throws finished writing!");
-            console.log("Writing grande explode events");
-            this.writeEventArray(writeStream, this.userGrenadeExplodeEventList);
-            writeStream.end();
-        });
-        writeStream.on("error", (error)=>
-        {
-            console.error("An error occured while writing the practice file: ", error)
-        });
-        writeStream.on("finish", ()=>
-        {
-            this.userGrenadeExplodeEventList = [];
-            console.log("Practice file creation completed");
-        });
+       this.createFlashbangFile();
+       this.createMolotovFile();
+       this.createHeGrenadeFile();
+       this.createSmokeFile();
+       this.createDecoyFile();
     }
 
     private createFlashbangFile() :void
@@ -81,7 +60,8 @@ export class PracticeFileCreator
         {
             console.log("Writing the flashbang file...");
             //Collect data
-            this.writeEventArray(stream, this.userThrowGrenadeEventList);
+            this.writeEventArray(stream, this.userFlashbangThrowEvent);
+            this.writeEventArray(stream, this.userFlashbangDetonateEvent);
             stream.end();
         });
         stream.on("error", (error)=>
@@ -101,7 +81,11 @@ export class PracticeFileCreator
         stream.on("ready", ()=>
         {
             console.log("Starting to write molotov file...");
-            this.writeEventArray(stream, this.userGrenadeExplodeEventList);
+            this.writeEventArray(stream, this.userMolotovThrowEvent);
+            this.writeEventArray(stream, this.userMolotovDetonateEvent);
+            this.writeEventArray(stream, this.userIncendiaryThrowEvent);
+            this.writeEventArray(stream, this.userIncendiaryDetonateEvent);
+            stream.end();
         });
         stream.on("error", (error)=>
         {
@@ -110,6 +94,69 @@ export class PracticeFileCreator
         stream.on("finish", ()=>
         {
             console.log("Molotov file finsihed writing");
+        });
+    }
+    private createHeGrenadeFile(): void
+    {
+        const path: string = "./PracticeFileOut/he_grenades.json";
+        const stream = fs.createWriteStream(path);
+
+        stream.on("ready", ()=>
+        {
+            console.log("Starting to write he_grenade.json...");
+            this.writeEventArray(stream, this.userHeGrenadeThrowEvent);
+            this.writeEventArray(stream, this.userHeGrenadeDetonateEvent);
+            stream.end();
+        });
+        stream.on("error", (error)=>
+        {
+            console.error("Error writing he_grenade.json", error);
+        });
+        stream.on("finish", ()=>
+        {
+            console.log("he_grenade.json finished writing");
+        });
+    }
+    private createSmokeFile(): void
+    {
+        const path: string = "./PracticeFileOut/smokes.json";
+        const stream = fs.createWriteStream(path);
+
+        stream.on("ready", ()=>
+        {
+            console.log("Starting to write smokes.json...");
+            this.writeEventArray(stream, this.userSmokeThrowEvent);
+            this.writeEventArray(stream, this.userSmokeDetonateEvent);
+            stream.end();
+        });
+        stream.on("error", (error)=>
+        {
+            console.error("There was an error creating smokes.json", error);
+        });
+        stream.on("finish", ()=>
+        {
+            console.log("Finished writing smokes.json");
+        });
+    }
+    private createDecoyFile(): void
+    {
+        const path: string = "./PracticeFileOut/decoys.json";
+        const stream = fs.createWriteStream(path);
+
+        stream.on("ready", ()=>
+        {
+            console.log("Starting to write decoys.json...");
+            this.writeEventArray(stream, this.userDecoyThrowEvent);
+            this.writeEventArray(stream, this.userDecoyDetonateEvent);
+            stream.end();
+        })
+        stream.on("error",(error)=>
+        {
+            console.error("There was an error trying to create decoy.json");
+        });
+        stream.on("finish", ()=>
+        {
+            console.log("Finished writing decoys.json");
         });
     }
 
@@ -140,6 +187,14 @@ export class PracticeFileCreator
     public addMolotovDetonateEvent(event: GrenadeExplodeSnapshot)
     {
         this.userMolotovDetonateEvent.push({...event});
+    }
+    public addIncendiaryThrowEvent(event: GrenadeThrowSnapshot)
+    {
+        this.userIncendiaryThrowEvent.push({...event});
+    }
+    public addIncendiaryDetonateEvent(event: GrenadeExplodeSnapshot)
+    {
+        this.userIncendiaryDetonateEvent.push({...event});
     }
 
     public addHeGrenadeThrowEvent(event: GrenadeThrowSnapshot)
