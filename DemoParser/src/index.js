@@ -27,127 +27,12 @@ const demofile_1 = require("demofile");
 const fs = __importStar(require("fs"));
 //import { PlayerKillSnapshot, PlayerDeathSnapshot, GrenadeExplodeSnapshot, GrenadeThrowSnapshot } from "./utility/snapshots";
 const PracticeFileCreator_1 = require("./utility/PracticeFileCreator");
-class DemoPlaybackFrame {
-    constructor() {
-        this.playerData = [];
-        this.grenadeEventList = []; //could be more than one grenade thrown in a frame
-    }
-}
-class DemoPlayback {
-    constructor() {
-        this.FrameData = [];
-        this.AllGrenadeThrowEvents = [];
-    }
-    setPlayerData(arr) {
-        this.CurrentFrame.playerData.push(arr);
-    }
-    addGrenadeThrowEvent(event) {
-        var _a;
-        (_a = this.AllGrenadeThrowEvents) === null || _a === void 0 ? void 0 : _a.push({
-            playerId: event.thrower.userId,
-            trajectory: event.trajectory,
-            type: event.projectile.grenadeType,
-            playerPos: event.thrower.position,
-            playerEyes: event.thrower.eyeAngles
-        });
-    }
-    StartFrame(currentTick) {
-        this.CurrentFrame = new DemoPlaybackFrame();
-        this.CurrentFrame.tick = currentTick;
-    }
-    EndFrame() {
-        var _a;
-        (_a = this.FrameData) === null || _a === void 0 ? void 0 : _a.push(Object.assign({}, this.CurrentFrame));
-        this.FrameData = undefined;
-    }
-}
-class DemoDataParser {
-    constructor() {
-        this.playerList = []; //Holds All the HUMAN controlled player objects || We only care about playable character data
-        this.isReady = false;
-        //Variables for entire game stats file
-        this.allGrenadeEventList = [];
-        //Variables for user game stats file
-        //Variables for "hacked" playback file
-        this.pushedFrames = [];
-        //Variables for "hacked" practice file
-        //Variables that can be shared (labled with what)
-        this.userGrenadeEventList = []; //  "hacked" practice file || user game stats file 
-    }
-    //Functions for gathering entire game stats
-    //Functions for gathering user game stats
-    //Functions for "hacked" playback file
-    setFramePlayerData(arr) {
-        var _a;
-        (_a = this.currentFrame) === null || _a === void 0 ? void 0 : _a.playerData.push(...arr);
-    }
-    beginFrame(currentTick) {
-        this.currentFrame = new DemoPlaybackFrame();
-        if (this.currentFrame)
-            this.isReady = true;
-        this.currentFrame.tick = currentTick;
-    }
-    endFrame() {
-        if (this.currentFrame) {
-            this.pushedFrames.push(Object.assign({}, this.currentFrame)); //make a copy of the current frame
-            this.currentFrame = undefined;
-        }
-        else if (this.isReady) {
-            throw new Error("No current frame to end");
-        }
-    }
-    //Functions for "hacked" practice file
-    addGrenadeEvent(event) {
-        var _a;
-        if (this.userId) {
-            this.userGrenadeEventList.push({
-                playerId: event.thrower.userId,
-                playerEyes: event.thrower.eyeAngles,
-                playerPos: event.thrower.position,
-                trajectory: event.trajectory,
-                type: event.projectile.grenadeType,
-            });
-        }
-        this.allGrenadeEventList.push({
-            playerId: event.thrower.userId,
-            playerEyes: event.thrower.eyeAngles,
-            playerPos: event.thrower.position,
-            trajectory: event.trajectory,
-            type: event.projectile.grenadeType,
-        });
-        (_a = this.currentFrame) === null || _a === void 0 ? void 0 : _a.grenadeEventList.push({
-            playerId: event.thrower.userId,
-            playerEyes: event.thrower.eyeAngles,
-            playerPos: event.thrower.position,
-            trajectory: event.trajectory,
-            type: event.projectile.grenadeType,
-        });
-    }
-    //Utiltiy Functions
-    setUserId(id) {
-        this.userId = id;
-    }
-}
-const demoParser = new DemoDataParser();
-function gatherPlayerData(demoFile) {
-    var _a;
-    if (!demoFile.entities.players[0])
-        return null;
-    else {
-        const players = [];
-        for (let i = 0; i < demoFile.entities.players.length; i++) {
-            if (((_a = demoFile.entities.players[i]) === null || _a === void 0 ? void 0 : _a.name) !== "GOTV") {
-                players.push(demoFile.entities.players[i].name);
-            }
-        }
-        return players;
-    }
-}
-function gatherEndFrameData(demoFile) {
-    const playerData = gatherPlayerData(demoFile);
-    return playerData;
-    //console.log(playerData);
-}
+//Parse a CS:GO demo file and create a new "controls" file to be used by the "Custom Demo Replay Tool" to mimic player controls in engine
+//Consolidates all relevent game events and records player information each tick. || grenade thrown, weapon fired, player health, player pos, etc. 
+//Create a "data" file that returns the end game stats of each player || Deaths, flashbangs thrown, players blinded, etc.
+//NOTES: 
+//Need to handle things like players reconnecting and disconnecting and still being able to track them || Will probably use "name" string off of demoFile.entities.players[i].name
+//Make sure we save the old name when name changes happen
 class DemoParser {
     constructor() {
         this.pFile = new PracticeFileCreator_1.PracticeFileCreator();
@@ -164,21 +49,29 @@ class DemoParser {
         });
         demoFile.on("tickstart", () => {
             //console.log(demoFile.currentTick)
-            demoParser.beginFrame(demoFile.currentTick);
         });
         demoFile.on("tickend", () => {
-            const data = gatherEndFrameData(demoFile);
-            if (data === null || data === void 0 ? void 0 : data.length)
-                demoParser.setFramePlayerData(data);
-            demoParser.endFrame();
             //console.log(demoFile.currentTick)
         });
         demoFile.gameEvents.on("player_blind", (e) => {
         });
         demoFile.on("grenadeTrajectory", (e) => {
-            if (e.thrower.name === this.user)
-                this.pFile.addGrenadeThrowEvent(e, demoFile);
-            //console.log(e.thrower.name, "threw a ", e.projectile.grenadeType)
+            if (e.thrower.name === this.user) {
+                switch (e.projectile.grenadeType) {
+                    case "flashbang":
+                        this.pFile.addFlashbangThrowEvent({ type: "flashbang", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), trajectory: e.trajectory });
+                    case "molotov":
+                        this.pFile.addMolotovThrowEvent({ type: "molotov", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), trajectory: e.trajectory });
+                    case "smoke":
+                        this.pFile.addSmokeThrowEvent({ type: "smoke", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), trajectory: e.trajectory });
+                    case "explosive":
+                        this.pFile.addHeGrenadeThrowEvent({ type: "explosive", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), trajectory: e.trajectory });
+                    case "decoy":
+                        this.pFile.addDecoyThrowEvent({ type: "decoy", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), trajectory: e.trajectory });
+                    case "incendiary":
+                        this.pFile.addIncendiaryThrowEvent({ type: "incendiary", thrower: e.thrower.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), trajectory: e.trajectory });
+                }
+            }
         });
         demoFile.on("molotovDetonate", (e) => {
         });
@@ -188,14 +81,14 @@ class DemoParser {
         });
         demoFile.gameEvents.on("flashbang_detonate", (e) => {
             if (e.player.name === this.user)
-                this.pFile.addGrenadeExplodeEvent({ type: "flashbang", thrower: e.player.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), position: { x: e.x, y: e.y, z: e.z } });
+                this.pFile.addFlashbangDetonateEvent({ type: "flashbang", thrower: e.player.userId, playerPos: demoFile.entities.players.map(p => { return p.position; }), playerEyes: demoFile.entities.players.map(p => { return p.eyeAngles; }), position: { x: e.x, y: e.y, z: e.z } });
         });
         demoFile.on("end", (e) => {
             if (e.error) {
                 console.error("Error during parsing:", e.error);
                 process.exitCode = 1;
             }
-            this.pFile.createFile();
+            this.pFile.createFiles();
         });
         demoFile.parseStream(stream);
     }
